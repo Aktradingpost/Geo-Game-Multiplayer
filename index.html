@@ -1,0 +1,1422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multiplayer Geocaching Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  <style>
+    body { 
+      background: #f1faee; 
+      font-family: 'Segoe UI', Arial, sans-serif; 
+      margin: 0; 
+      min-height: 100vh;
+      width: 100vw;
+      overflow-x: hidden;
+    }
+    .container { 
+      max-width: 900px; 
+      margin: 2rem auto; 
+      background: #fff; 
+      border-radius: 18px; 
+      box-shadow: 0 4px 16px rgba(44, 62, 80, 0.08); 
+      padding: 2.5rem 2rem; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+    }
+    .hidden { display: none !important; }
+    
+    /* Player Setup Styles */
+    .setup-header {
+      text-align: center;
+      margin-bottom: 2rem;
+    }
+    .player-slots {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      width: 100%;
+      margin-bottom: 2rem;
+    }
+    .player-slot {
+      background: #f8f9fa;
+      border: 3px solid #dee2e6;
+      border-radius: 12px;
+      padding: 1.5rem;
+      min-height: 120px;
+    }
+    .player-slot.filled {
+      border-color: #40916c;
+      background: #f1faee;
+    }
+    .player-slot h3 {
+      margin: 0 0 1rem 0;
+      color: #2d6a4f;
+    }
+    .player-info {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .player-avatar-display {
+      font-size: 3rem;
+    }
+    .player-name-display {
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: #2d6a4f;
+    }
+    
+    .character-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
+  margin: 1rem 0;
+  max-width: 100%;
+}
+    .character-option {
+  background: #f1faee;
+  border: 2px solid #b7e4c7;
+  border-radius: 10px;
+  padding: 0.5rem;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s;
+  min-width: 0;
+}
+    .character-option:hover:not(.taken) {
+      border-color: #f9c74f;
+      transform: scale(1.05);
+    }
+    .character-option.taken {
+      opacity: 0.3;
+      cursor: not-allowed;
+      border-color: #ccc;
+    }
+    .character-option.selected {
+      border-color: #f9844a;
+      background: #fffbe6;
+      box-shadow: 0 0 0 3px rgba(249, 132, 74, 0.2);
+    }
+    .character-emoji {
+  font-size: 2rem;
+}
+    .character-name {
+      font-size: 0.9rem;
+      color: #2d6a4f;
+      margin-top: 0.3rem;
+    }
+    
+    .name-input {
+      width: 100%;
+      padding: 0.7rem;
+      border: 2px solid #b7e4c7;
+      border-radius: 8px;
+      font-size: 1rem;
+      margin-top: 1rem;
+    }
+    .add-player-btn, .start-game-btn {
+      padding: 0.7rem 1.5rem;
+      font-size: 1rem;
+      font-weight: bold;
+      color: #fff;
+      background: #40916c;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    .add-player-btn:hover, .start-game-btn:hover {
+      background: #2d6a4f;
+    }
+    .start-game-btn {
+      background: linear-gradient(90deg, #2d6a4f, #40916c);
+      padding: 1rem 3rem;
+      font-size: 1.2rem;
+      margin-top: 2rem;
+    }
+    
+    /* Game Styles */
+    .game-header {
+      width: 100%;
+      margin-bottom: 1.5rem;
+    }
+    .round-info {
+      text-align: center;
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #2d6a4f;
+      margin-bottom: 1rem;
+    }
+    .current-turn {
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: bold;
+      color: #f9844a;
+      padding: 1rem;
+      background: #fffbe6;
+      border-radius: 10px;
+      margin-bottom: 1rem;
+      border: 3px solid #f9c74f;
+    }
+    
+    .landmark-photo {
+      width: 100%;
+      max-width: 600px;
+      height: 400px;
+      object-fit: cover;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(44, 62, 80, 0.10);
+      margin-bottom: 1rem;
+      background: #f0f0f0;
+    }
+    
+    .hint-buttons {
+      display: flex;
+      gap: 0.7rem;
+      flex-wrap: wrap;
+      margin: 1rem 0;
+      justify-content: center;
+    }
+    .hint-btn {
+      background: #f1faee;
+      color: #2d6a4f;
+      border: 2px solid #b7e4c7;
+      border-radius: 8px;
+      padding: 0.5em 1.2em;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .hint-btn.revealed {
+      background: #fffbe6;
+      color: #888;
+      border-color: #f9c74f;
+    }
+    
+    .timer-container {
+      text-align: center;
+      margin: 1rem 0;
+    }
+    #timerDisplay {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #2d6a4f;
+      background: #fff;
+      border-radius: 18px;
+      box-shadow: 0 4px 24px rgba(44, 62, 80, 0.10);
+      padding: 0.4rem 1.5rem;
+      letter-spacing: 2px;
+      border: 4px solid #b7e4c7;
+      display: inline-block;
+    }
+    
+    .map-container {
+      width: 100%;
+      height: 500px;
+      position: relative;
+      margin: 1.5rem 0;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+      border-radius: 12px;
+      box-shadow: 0 4px 16px rgba(44, 62, 80, 0.08);
+    }
+    
+    .lock-guess-btn {
+      padding: 1rem 2.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #fff;
+      background: linear-gradient(90deg, #f9844a, #f9c74f);
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin: 1rem 0;
+      box-shadow: 0 4px 12px rgba(249, 132, 74, 0.3);
+    }
+    .lock-guess-btn:hover {
+      background: linear-gradient(90deg, #f9c74f, #f9844a);
+      transform: scale(1.05);
+    }
+    .lock-guess-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      transform: none;
+    }
+    
+    /* Leaderboard Styles */
+    .leaderboard {
+      width: 100%;
+      margin: 2rem 0;
+    }
+    .leaderboard h2 {
+      text-align: center;
+      color: #2d6a4f;
+      margin-bottom: 1.5rem;
+    }
+    .leaderboard-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .leaderboard-table th {
+      background: #2d6a4f;
+      color: white;
+      padding: 1rem;
+      text-align: left;
+    }
+    .leaderboard-table td {
+      padding: 1rem;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .leaderboard-table tr:nth-child(even) {
+      background: #f8f9fa;
+    }
+    .leaderboard-table tr.eliminated {
+      opacity: 0.5;
+      text-decoration: line-through;
+      background: #ffebee;
+    }
+    .leaderboard-table tr.winner {
+      background: #fff9c4;
+      font-weight: bold;
+    }
+    .player-rank {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #f9844a;
+    }
+    
+    .elimination-notice {
+      background: #ffebee;
+      border: 3px solid #ef5350;
+      border-radius: 12px;
+      padding: 2rem;
+      text-align: center;
+      margin: 2rem 0;
+      animation: shake 0.5s;
+    }
+    .elimination-notice h2 {
+      color: #c62828;
+      margin: 0 0 1rem 0;
+      font-size: 2rem;
+    }
+    .elimination-notice .eliminated-player {
+      font-size: 1.5rem;
+      color: #e53935;
+    }
+    
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+    
+    .winner-screen {
+      text-align: center;
+      padding: 3rem;
+    }
+    .winner-screen h1 {
+      font-size: 3rem;
+      color: #2d6a4f;
+      margin-bottom: 2rem;
+      animation: bounce 1s infinite;
+    }
+    .winner-avatar {
+      font-size: 6rem;
+      margin: 2rem 0;
+    }
+    
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-20px); }
+    }
+    
+    .next-round-btn, .finish-btn {
+      padding: 1rem 2.5rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #fff;
+      background: #2d6a4f;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 2rem;
+    }
+    .next-round-btn:hover, .finish-btn:hover {
+      background: #40916c;
+    }
+    
+    @media (max-width: 700px) {
+      .container {
+        padding: 1rem;
+        margin: 1rem;
+      }
+      .player-slots {
+        grid-template-columns: 1fr;
+      }
+      .character-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .map-container {
+        height: 400px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Player Setup Screen -->
+  <div class="container" id="setupContainer">
+    <div class="setup-header">
+      <h1>🗺️ Multiplayer Geocaching Game 🗺️</h1>
+      <p>Add 2-8 players to start the game!</p>
+    </div>
+    
+    <div class="player-slots" id="playerSlots"></div>
+    
+    <button class="start-game-btn hidden" id="startGameBtn">Start Game</button>
+  </div>
+
+  <!-- Game Screen -->
+  <div class="container hidden" id="gameContainer">
+    <div class="game-header">
+      <div class="round-info" id="roundInfo">Round 1 of 30</div>
+      <div class="current-turn" id="currentTurn"></div>
+    </div>
+    
+    <img id="landmarkPhoto" class="landmark-photo" src="" alt="Landmark">
+    
+    <div class="hint-buttons" id="hintButtons"></div>
+    
+    <div class="timer-container">
+      <div id="timerDisplay">2:00</div>
+    </div>
+    
+    <div class="map-container">
+      <div id="map"></div>
+    </div>
+    
+    <button class="lock-guess-btn" id="lockGuessBtn" disabled>Lock In Your Guess</button>
+    
+    <div class="leaderboard hidden" id="leaderboard">
+      <h2>📊 Leaderboard 📊</h2>
+      <table class="leaderboard-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Player</th>
+            <th>Distance</th>
+            <th>Round Score</th>
+            <th>Total Score</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody"></tbody>
+      </table>
+    </div>
+    
+    <div class="elimination-notice hidden" id="eliminationNotice"></div>
+    
+    <button class="next-round-btn hidden" id="nextRoundBtn">Next Round</button>
+  </div>
+
+  <!-- Winner Screen -->
+  <div class="container hidden" id="winnerContainer">
+    <div class="winner-screen">
+      <h1>🎉 WINNER! 🎉</h1>
+      <div class="winner-avatar" id="winnerAvatar"></div>
+      <h2 id="winnerName"></h2>
+      <p id="winnerScore"></p>
+      
+      <div class="leaderboard">
+        <h2>Final Rankings</h2>
+        <table class="leaderboard-table">
+          <thead>
+            <tr>
+              <th>Rank</th>
+              <th>Player</th>
+              <th>Total Score</th>
+            </tr>
+          </thead>
+          <tbody id="finalLeaderboard"></tbody>
+        </table>
+      </div>
+      
+      <button class="finish-btn" onclick="location.reload()">Play Again</button>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // DOM Elements
+    const setupContainer = document.getElementById('setupContainer');
+    const gameContainer = document.getElementById('gameContainer');
+    const winnerContainer = document.getElementById('winnerContainer');
+    const playerSlots = document.getElementById('playerSlots');
+    const startGameBtn = document.getElementById('startGameBtn');
+    const roundInfo = document.getElementById('roundInfo');
+    const currentTurn = document.getElementById('currentTurn');
+    const landmarkPhoto = document.getElementById('landmarkPhoto');
+    const hintButtons = document.getElementById('hintButtons');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const lockGuessBtn = document.getElementById('lockGuessBtn');
+    const leaderboard = document.getElementById('leaderboard');
+    const leaderboardBody = document.getElementById('leaderboardBody');
+    const eliminationNotice = document.getElementById('eliminationNotice');
+    const nextRoundBtn = document.getElementById('nextRoundBtn');
+
+    // Game Data
+    const characters = [
+      { name: "Explorer", emoji: "🧭", color: "#e74c3c" },
+      { name: "Adventurer", emoji: "🏔️", color: "#3498db" },
+      { name: "Wanderer", emoji: "🚶", color: "#2ecc71" },
+      { name: "Voyager", emoji: "🚢", color: "#f39c12" },
+      { name: "Navigator", emoji: "🗺️", color: "#9b59b6" },
+      { name: "Traveler", emoji: "✈️", color: "#e67e22" },
+      { name: "Pioneer", emoji: "🚀", color: "#1abc9c" },
+      { name: "Discoverer", emoji: "🔍", color: "#34495e" }
+    ];
+
+    const landmarks = [
+      {
+        name: "Eiffel Tower",
+        latitude: 48.8584,
+        longitude: 2.2945,
+        photoUrl: "https://plus.unsplash.com/premium_photo-1719430569503-338fc89eb21f?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=686",
+        hints: [
+          "This iron structure is one of the most visited paid monuments in the world.",
+          "It was built for the 1889 World's Fair.",
+          "It is located in the capital of France.",
+          "It offers panoramic views of Paris.",
+          "Its name comes from its engineer, Gustave."
+        ]
+      },
+      {
+        name: "Statue of Liberty",
+        latitude: 40.6892,
+        longitude: -74.0445,
+        photoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/a1/Statue_of_Liberty_7.jpg",
+        hints: [
+          "This monument was a gift from France to the United States.",
+          "It stands on Liberty Island.",
+          "It is a symbol of freedom and democracy.",
+          "It holds a torch in its right hand.",
+          "It is located in New York Harbor."
+        ]
+      },
+      {
+        name: "Great Wall (Mutianyu)",
+        latitude: 40.4319,
+        longitude: 116.5704,
+        photoUrl: "https://dynamic-media-cdn.tripadvisor.com/media/photo-o/16/e4/10/e4/it-was-an-amazing-experience.jpg?w=1400&h=-1&s=1",
+        hints: [
+          "This is a series of fortifications built across northern China.",
+          "It was constructed over several dynasties to protect against invasions.",
+          "It stretches for thousands of kilometers.",
+          "Many sections are popular tourist attractions near Beijing.",
+          "It is often (incorrectly) claimed to be visible from space."
+        ]
+      },
+      {
+        name: "Taj Mahal",
+        latitude: 27.1751,
+        longitude: 78.0421,
+        photoUrl: "https://images.unsplash.com/photo-1564507592333-c60657eea523?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1471",
+        hints: [
+          "An ivory-white marble mausoleum built by a Mughal emperor.",
+          "It was constructed as a tomb for the emperor's wife.",
+          "Located in Agra, India.",
+          "It is a UNESCO World Heritage site and an icon of love.",
+          "It features symmetrical gardens and reflecting pools."
+        ]
+      },
+      {
+        name: "Colosseum",
+        latitude: 41.8902,
+        longitude: 12.4922,
+        photoUrl: "https://images.unsplash.com/photo-1552832230-c0197dd311b5?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1096",
+        hints: [
+          "An ancient amphitheater used for gladiatorial contests.",
+          "Located in the heart of Rome, Italy.",
+          "It could hold tens of thousands of spectators.",
+          "Construction began under Emperor Vespasian.",
+          "It is one of the best-known symbols of Imperial Rome."
+        ]
+      },
+      {
+        name: "Machu Picchu",
+        latitude: -13.1631,
+        longitude: -72.5450,
+        photoUrl: "https://images.unsplash.com/photo-1580619305218-8423a7ef79b4?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1474",
+        hints: [
+          "A 15th-century Inca citadel set high in the Andes Mountains.",
+          "Located in Peru, above the Sacred Valley.",
+          "Famous for its dry-stone walls and panoramic views.",
+          "Rediscovered by Hiram Bingham in 1911.",
+          "Often reached via the Inca Trail."
+        ]
+      },
+      {
+        name: "Christ the Redeemer",
+        latitude: -22.9519,
+        longitude: -43.2105,
+        photoUrl: "https://destinationlesstravel.com/wp-content/uploads/2022/10/Christ-the-Redeemer-statue-Rio-de-Janeiro-Brazil.jpg.webp",
+        hints: [
+          "A large Art Deco statue of Jesus Christ atop a mountain.",
+          "Overlooks a famous coastal city in Brazil.",
+          "Constructed in the early 20th century.",
+          "A symbol of Christianity across the world.",
+          "Visitors often take a train or hike to reach it."
+        ]
+      },
+      {
+        name: "Sydney Opera House",
+        latitude: -33.8568,
+        longitude: 151.2153,
+        photoUrl: "https://images.unsplash.com/photo-1540448051910-09cfadd5df61?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
+        hints: [
+          "A multi-venue performing arts centre noted for its sail-like design.",
+          "Located on Bennelong Point in Australia.",
+          "Designed by Danish architect Jørn Utzon.",
+          "A UNESCO World Heritage site.",
+          "Hosts opera, theatre, and concerts."
+        ]
+      },
+      {
+        name: "Big Ben (Elizabeth Tower)",
+        latitude: 51.5007,
+        longitude: -0.1246,
+        photoUrl: "https://images.unsplash.com/photo-1588064011404-57a7bc7133f5?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=687",
+        hints: [
+          "A famous clock tower at the north end of the Palace of Westminster.",
+          "Located in London, United Kingdom.",
+          "The bell inside is often referred to by the tower's name.",
+          "An iconic symbol of British parliamentary democracy.",
+          "The official name of the tower is Elizabeth Tower."
+        ]
+      },
+      {
+        name: "Pyramids of Giza",
+        latitude: 29.9792,
+        longitude: 31.1342,
+        photoUrl: "https://upload.wikimedia.org/wikipedia/commons/a/af/All_Gizah_Pyramids.jpg",
+        hints: [
+          "Ancient monumental tombs built for Egyptian pharaohs.",
+          "Located on the Giza plateau near Cairo.",
+          "The Great Pyramid is one of the Seven Wonders of the Ancient World.",
+          "Constructed from massive limestone blocks.",
+          "A major archaeological and tourist site."
+        ]
+      },
+      {
+        name: "Mount Fuji",
+        latitude: 35.3606,
+        longitude: 138.7274,
+        photoUrl: "https://images.unsplash.com/photo-1526481280693-3bfa7568e0f3?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1171",
+        hints: [
+          "An active stratovolcano and Japan's highest peak.",
+          "A famous subject in Japanese art and photography.",
+          "Often climbed during a short summer season.",
+          "Located near Tokyo and visible on clear days.",
+          "Considered a sacred mountain in Japanese culture."
+        ]
+      },
+      {
+        name: "Angkor Wat",
+        latitude: 13.4125,
+        longitude: 103.8667,
+        photoUrl: "https://plus.unsplash.com/premium_photo-1661963188432-5de8a11f21a7?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1170",
+        hints: [
+          "A massive temple complex in Cambodia and prime archaeological site.",
+          "Originally constructed as a Hindu temple, later became Buddhist.",
+          "Famous for its extensive bas-reliefs and towers.",
+          "Located near the town of Siem Reap.",
+          "A UNESCO World Heritage site."
+        ]
+      },
+      {
+        name: "Golden Gate Bridge",
+        latitude: 37.8199,
+        longitude: -122.4783,
+        photoUrl: "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1632",
+        hints: [
+          "A suspension bridge spanning the Golden Gate strait.",
+          "Connects San Francisco to Marin County.",
+          "Known for its International Orange color.",
+          "Opened in 1937 and was an engineering marvel.",
+          "A frequent subject of photographs and films."
+        ]
+      },
+      {
+        name: "Niagara Falls",
+        latitude: 43.0799,
+        longitude: -79.0747,
+        photoUrl: "https://images.unsplash.com/photo-1463695970743-ae65cca05743?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
+        hints: [
+          "A group of three large waterfalls straddling the US-Canada border.",
+          "Famous for hydroelectric power and tourism.",
+          "The Horseshoe Falls are the largest by flow.",
+          "Located near cities of Niagara Falls (US/Canada).",
+          "Often visited on honeymoon and sightseeing trips."
+        ]
+      },
+      {
+        name: "Burj Khalifa",
+        latitude: 25.1972,
+        longitude: 55.2744,
+        photoUrl: "https://plus.unsplash.com/premium_photo-1694475634077-e6e4b623b574?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1371",
+        hints: [
+          "The tallest building in the world as of the 21st century.",
+          "Located in a major Middle Eastern city known for skyscrapers.",
+          "Features observation decks with panoramic views.",
+          "Opened in the 2010s and is part of a large development.",
+          "Its design is inspired by regional desert flowers."
+        ]
+      },
+      {
+        name: "Petra",
+        latitude: 30.3285,
+        longitude: 35.4444,
+        photoUrl: "https://eqt2rjatsu6.exactdn.com/wp-content/uploads/2023/04/20230412_080852.jpg?strip=all&lossy=1&ssl=1",
+        hints: [
+          "An archaeological city carved into rose-red sandstone.",
+          "Located in Jordan and was the capital of the Nabataeans.",
+          "Famous gateway called the Treasury (Al-Khazneh).",
+          "A dramatic canyon called the Siq leads to many sites.",
+          "A UNESCO World Heritage site."
+        ]
+      },
+      {
+        name: "Leaning Tower of Pisa",
+        latitude: 43.7230,
+        longitude: 10.3966,
+        photoUrl: "https://plus.unsplash.com/premium_photo-1661962754715-d081d9ec53a3?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=687",
+        hints: [
+          "A freestanding bell tower famous for its tilt.",
+          "Located in a city in Tuscany, Italy.",
+          "Construction began in the 12th century.",
+          "Stabilization work in the 20th–21st centuries reduced the tilt.",
+          "It stands next to a cathedral and baptistery."
+        ]
+      },
+      {
+        name: "Acropolis (Parthenon)",
+        latitude: 37.9715,
+        longitude: 23.7257,
+        photoUrl: "https://smarthistory.org/wp-content/uploads/2020/08/Acropolis_of_Athens_viewed_from_the_Hill_of_the_Muses_14220794964-scaled.jpg",
+        hints: [
+          "An ancient citadel on a rocky outcrop above a Mediterranean city.",
+          "Contains the Parthenon, a temple dedicated to Athena.",
+          "Located in Greece's capital.",
+          "A major symbol of classical architecture.",
+          "A UNESCO World Heritage site visited by millions."
+        ]
+      },
+      {
+        name: "Grand Canyon (South Rim)",
+        latitude: 36.0544,
+        longitude: -112.1401,
+        photoUrl: "https://www.nps.gov/npgallery/GetAsset/f73a9730-155d-451f-67d1-a31a2b667b8a/proxy/hires?",
+        hints: [
+          "A vast canyon carved by a major North American river.",
+          "Known for layered bands of red rock revealing millions of years of history.",
+          "Located in a southwestern US state.",
+          "Popular for hiking, rafting, and scenic overlooks.",
+          "The South Rim is the most visited area."
+        ]
+      },
+      {
+        name: "Stonehenge",
+        latitude: 51.1789,
+        longitude: -1.8262,
+        photoUrl: "https://images.unsplash.com/photo-1599833975787-5c143f373c30?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1828",
+        hints: [
+          "A prehistoric monument of standing stones arranged in a circle.",
+          "Located on Salisbury Plain in England.",
+          "Its exact purpose remains a subject of research and speculation.",
+          "Associated with astronomical alignments at solstices.",
+          "A UNESCO World Heritage site."
+        ]
+      },
+      {
+        name: "Sagrada Familia",
+        latitude: 41.4036,
+        longitude: 2.1744,
+        photoUrl: "https://www.barcelona-tourist-guide.com/images/int/attractions/sagrada-familia/L550/sagrada-familia-9303.jpg",
+        hints: [
+          "An unfinished large Roman Catholic church with distinctive towers.",
+          "Designed by Catalan architect Antoni Gaudí.",
+          "Located in Barcelona, Spain.",
+          "Construction started in the late 19th century and continues today.",
+          "A UNESCO World Heritage site and major tourist draw."
+        ]
+      },
+      {
+        name: "Neuschwanstein Castle",
+        latitude: 47.5576,
+        longitude: 10.7498,
+        photoUrl: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f8/Schloss_Neuschwanstein_2013.jpg/960px-Schloss_Neuschwanstein_2013.jpg",
+        hints: [
+          "A 19th-century Romanesque Revival palace on a rugged hill.",
+          "Located in Bavaria, Germany.",
+          "Built by King Ludwig II and inspired fairy-tale imagery.",
+          "Served as inspiration for theme park castles.",
+          "Surrounded by scenic alpine landscapes."
+        ]
+      },
+      {
+        name: "Kremlin (Moscow)",
+        latitude: 55.7520,
+        longitude: 37.6175,
+        photoUrl: "https://plus.unsplash.com/premium_photo-1697729939290-40a6275148cd?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2562",
+        hints: [
+          "A fortified complex at the heart of Russia's capital city.",
+          "Contains palaces, cathedrals, and government offices.",
+          "Overlooks a major river that flows through the city.",
+          "Historically the seat of power for Russian rulers.",
+          "Its red brick walls and towers are iconic."
+        ]
+      },
+      {
+        name: "CN Tower",
+        latitude: 43.6426,
+        longitude: -79.3871,
+        photoUrl: "https://images.unsplash.com/photo-1509118796018-30cc4ce216f1?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=685",
+        hints: [
+          "A communications and observation tower in a major Canadian city.",
+          "Once the world's tallest free-standing structure.",
+          "Offers glass-floor and skywalk experiences.",
+          "Located on the waterfront of a large lake.",
+          "A defining landmark of its city's skyline."
+        ]
+      },
+      {
+        name: "Tower of London",
+        latitude: 51.5081,
+        longitude: -0.0759,
+        photoUrl: "https://images.unsplash.com/photo-1633894914370-6935b23ccbce?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1170",
+        hints: [
+          "A historic castle on the north bank of the River Thames.",
+          "Has served as a royal palace, prison, and treasury.",
+          "Home to the Crown Jewels.",
+          "Guarded historically by the Yeoman Warders (Beefeaters).",
+          "Located near other famous London landmarks."
+        ]
+      },
+      {
+        name: "Times Square",
+        latitude: 40.7580,
+        longitude: -73.9855,
+        photoUrl: "https://images.unsplash.com/photo-1538970272646-f61fabb3a8a2?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=695",
+        hints: [
+          "A major commercial intersection known for bright billboards and theaters.",
+          "Located in Midtown Manhattan, New York City.",
+          "Famous for New Year's Eve ball drop celebrations.",
+          "A hub for Broadway shows and tourist foot traffic.",
+          "Sometimes called \"The Crossroads of the World.\""
+        ]
+      },
+      {
+        name: "Louvre Museum",
+        latitude: 48.8606,
+        longitude: 2.3376,
+        photoUrl: "https://media.architecturaldigest.com/photos/5900cc370638dd3b70018b33/16:9/w_2240,c_limit/Secrets%20of%20Louvre%201.jpg",
+        hints: [
+          "One of the world's largest and most visited art museums.",
+          "Home of the Mona Lisa.",
+          "Located in a historic palace in Paris.",
+          "Features an iconic glass pyramid entrance.",
+          "Contains collections spanning many eras and regions."
+        ]
+      },
+      {
+        name: "Blue Mosque (Sultan Ahmed)",
+        latitude: 41.0055,
+        longitude: 28.9768,
+        photoUrl: "https://images.unsplash.com/photo-1541432901042-2d8bd64b4a9b?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1470",
+        hints: [
+          "A historic Ottoman-era mosque known for blue tiles.",
+          "Located in a city straddling two continents.",
+          "Constructed in the early 17th century.",
+          "Famous for multiple minarets and large courtyard.",
+          "Near the Hagia Sophia."
+        ]
+      },
+      {
+        name: "Himeji Castle",
+        latitude: 34.8394,
+        longitude: 134.6939,
+        photoUrl: "https://images.unsplash.com/photo-1606800995393-499566bde475?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1446",
+        hints: [
+          "A well-preserved Japanese castle known for white plastered walls.",
+          "Located in Hyōgo Prefecture.",
+          "Often called the White Heron Castle for its elegant appearance.",
+          "A UNESCO World Heritage site.",
+          "Features complex defensive systems and multiple baileys."
+        ]
+      },
+      {
+        name: "Uluru (Ayers Rock)",
+        latitude: -25.3450,
+        longitude: 131.0361,
+        photoUrl: "https://images.unsplash.com/photo-1529108190281-9a4f620bc2d8?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=1439",
+        hints: [
+          "A large sandstone monolith sacred to Indigenous Australians.",
+          "Located in the central Australian desert.",
+          "Known for dramatic color changes at sunrise and sunset.",
+          "Part of a national park and cultural reserve.",
+          "A popular site for nature tourism and cultural education."
+        ]
+      }
+    ];
+ // Shuffle function to randomize landmark order
+    function shuffleLandmarks() {
+      for (let i = landmarks.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [landmarks[i], landmarks[j]] = [landmarks[j], landmarks[i]];
+      }
+    }
+
+    // Game State
+    let players = [];
+    let currentRound = 0;
+    let currentPlayerIndex = 0;
+    let currentLandmark = null;
+    let hintsRevealed = 0;
+    let timer = null;
+    let timeLeft = 120;
+    let map = null;
+    let playerGuesses = {};
+    let eliminationRounds = [5, 10, 15, 20, 25];
+
+    // Player Setup Functions
+    function initializePlayerSlots() {
+      playerSlots.innerHTML = '';
+      for (let i = 0; i < 8; i++) {
+        const slot = document.createElement('div');
+        slot.className = 'player-slot';
+        slot.id = `player-slot-${i}`;
+        
+        if (i < 2) {
+          slot.innerHTML = `
+            <h3>Player ${i + 1} ${i === 0 ? '(Required)' : '(Required)'}</h3>
+            <div id="setup-${i}">
+              <div class="character-grid" id="char-grid-${i}"></div>
+              <input type="text" class="name-input" id="name-input-${i}" placeholder="Enter player name" maxlength="20">
+              <button class="add-player-btn" onclick="addPlayer(${i})">Add Player ${i + 1}</button>
+            </div>
+          `;
+        } else {
+          slot.innerHTML = `
+            <h3>Player ${i + 1} (Optional)</h3>
+            <div id="setup-${i}">
+              <div class="character-grid" id="char-grid-${i}"></div>
+              <input type="text" class="name-input" id="name-input-${i}" placeholder="Enter player name" maxlength="20">
+              <button class="add-player-btn" onclick="addPlayer(${i})">Add Player ${i + 1}</button>
+            </div>
+          `;
+        }
+        
+        playerSlots.appendChild(slot);
+        renderCharacterGrid(i);
+      }
+    }
+
+    function renderCharacterGrid(slotIndex) {
+      const grid = document.getElementById(`char-grid-${slotIndex}`);
+      grid.innerHTML = '';
+      
+      characters.forEach((char, idx) => {
+        const option = document.createElement('div');
+        option.className = 'character-option';
+        option.setAttribute('data-char-index', idx);
+        
+        const isTaken = players.some(p => p.characterIndex === idx);
+        if (isTaken) {
+          option.classList.add('taken');
+        }
+        
+        option.innerHTML = `
+          <div class="character-emoji">${char.emoji}</div>
+          <div class="character-name">${char.name}</div>
+        `;
+        
+        if (!isTaken) {
+          option.addEventListener('click', () => selectCharacter(slotIndex, idx));
+        }
+        
+        grid.appendChild(option);
+      });
+    }
+
+    let selectedCharacters = {};
+
+    function selectCharacter(slotIndex, charIndex) {
+      const grid = document.getElementById(`char-grid-${slotIndex}`);
+      const options = grid.querySelectorAll('.character-option');
+      
+      options.forEach(opt => opt.classList.remove('selected'));
+      options[charIndex].classList.add('selected');
+      
+      selectedCharacters[slotIndex] = charIndex;
+    }
+
+    function addPlayer(slotIndex) {
+      const nameInput = document.getElementById(`name-input-${slotIndex}`);
+      const playerName = nameInput.value.trim();
+      const charIndex = selectedCharacters[slotIndex];
+      
+      if (!playerName) {
+        alert('Please enter a player name!');
+        return;
+      }
+      
+      if (charIndex === undefined) {
+        alert('Please select a character!');
+        return;
+      }
+      
+      const player = {
+        id: slotIndex,
+        name: playerName,
+        characterIndex: charIndex,
+        character: characters[charIndex],
+        totalScore: 0,
+        roundScores: [],
+        eliminated: false
+      };
+      
+      players.push(player);
+      
+      const slot = document.getElementById(`player-slot-${slotIndex}`);
+      slot.classList.add('filled');
+      slot.innerHTML = `
+        <h3>Player ${slotIndex + 1}</h3>
+        <div class="player-info">
+          <div class="player-avatar-display">${player.character.emoji}</div>
+          <div class="player-name-display">${player.name}</div>
+        </div>
+      `;
+      
+      // Update all character grids to mark this character as taken
+      for (let i = 0; i < 8; i++) {
+        if (document.getElementById(`char-grid-${i}`)) {
+          renderCharacterGrid(i);
+        }
+      }
+      
+      if (players.length >= 2) {
+        startGameBtn.classList.remove('hidden');
+      }
+    }
+
+    startGameBtn.addEventListener('click', () => {
+  if (players.length < 2) {
+    alert('Need at least 2 players to start!');
+    return;
+  }
+  
+  // Shuffle landmarks for this game
+  shuffleLandmarks();
+  
+  setupContainer.classList.add('hidden');
+  gameContainer.classList.remove('hidden');
+  startNewRound();
+});
+
+    // Timer Functions
+    function startTimer() {
+      if (timer) clearInterval(timer);
+      
+      timeLeft = 120;
+      updateTimerDisplay();
+
+      timer = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay();
+
+        if (timeLeft <= 10) {
+          timerDisplay.style.color = timeLeft % 2 === 0 ? "red" : "#2d6a4f";
+        } else {
+          timerDisplay.style.color = "#2d6a4f";
+        }
+
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          timerDisplay.style.color = "#2d6a4f";
+          endRound();
+        }
+      }, 1000);
+    }
+
+    function updateTimerDisplay() {
+      const minutes = Math.floor(timeLeft / 60);
+      const seconds = timeLeft % 60;
+      timerDisplay.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+
+    function stopTimer() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+      timerDisplay.style.color = "#2d6a4f";
+    }
+
+    // Map Functions
+    function setupMap() {
+  if (map) {
+    map.remove();
+  }
+  
+  map = L.map('map', {
+    zoomControl: true,
+    attributionControl: true,
+    worldCopyJump: false,
+    maxBounds: [[-90, -180], [90, 180]],
+    maxBoundsViscosity: 1.0
+  }).setView([20, 0], 2);
+  
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19,
+    noWrap: true,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  }).addTo(map);
+  
+  map.on('click', function(e) {
+    const currentPlayer = players[currentPlayerIndex];
+    if (currentPlayer.eliminated) return;
+    
+    const guessLatLng = e.latlng;
+    
+    // Remove old marker if exists
+    if (playerGuesses[currentPlayer.id] && playerGuesses[currentPlayer.id].marker) {
+      map.removeLayer(playerGuesses[currentPlayer.id].marker);
+    }
+    
+    // Create new marker
+    const icon = L.divIcon({
+      className: 'custom-marker',
+      html: `<div style="background-color: ${currentPlayer.character.color}; width: 25px; height: 25px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 5px rgba(0,0,0,0.3);"></div>`,
+      iconSize: [25, 25],
+      iconAnchor: [12, 12]
+    });
+    
+    const marker = L.marker(guessLatLng, {icon: icon}).addTo(map);
+    marker.bindPopup(`${currentPlayer.name}'s guess`);
+    
+    // Store the guess
+    playerGuesses[currentPlayer.id] = {
+      latlng: guessLatLng,
+      marker: marker
+    };
+    
+    lockGuessBtn.disabled = false;
+  });
+}
+
+    // Game Functions
+    function startNewRound() {
+      currentRound++;
+      playerGuesses = {};
+      hintsRevealed = 0;
+      
+      if (currentRound > landmarks.length) {
+        endGame();
+        return;
+      }
+      
+      roundInfo.textContent = `Round ${currentRound} of ${landmarks.length}`;
+      currentLandmark = landmarks[currentRound - 1];
+      
+      landmarkPhoto.src = currentLandmark.photoUrl;
+      landmarkPhoto.alt = currentLandmark.name;
+      
+      renderHints();
+      setupMap();
+      
+      leaderboard.classList.add('hidden');
+      eliminationNotice.classList.add('hidden');
+      nextRoundBtn.classList.add('hidden');
+      lockGuessBtn.classList.remove('hidden');
+      
+      // Start with first non-eliminated player
+      currentPlayerIndex = 0;
+      while (currentPlayerIndex < players.length && players[currentPlayerIndex].eliminated) {
+        currentPlayerIndex++;
+      }
+      
+      if (currentPlayerIndex >= players.length) {
+        endGame();
+        return;
+      }
+      
+      updateCurrentTurn();
+      startTimer();
+    }
+
+    function updateCurrentTurn() {
+      const currentPlayer = players[currentPlayerIndex];
+      currentTurn.textContent = `${currentPlayer.character.emoji} ${currentPlayer.name}'s Turn`;
+      currentTurn.style.borderColor = currentPlayer.character.color;
+      lockGuessBtn.disabled = !playerGuesses[currentPlayer.id];
+    }
+
+    function renderHints() {
+      hintButtons.innerHTML = '';
+      const hints = currentLandmark.hints;
+      
+      for (let i = 0; i < Math.min(3, hints.length); i++) {
+        const btn = document.createElement('button');
+        btn.className = 'hint-btn';
+        
+        if (i < hintsRevealed) {
+          btn.classList.add('revealed');
+          btn.textContent = hints[i];
+          btn.disabled = true;
+        } else if (i === hintsRevealed) {
+          btn.textContent = `Reveal Hint ${i + 1} (-25 points)`;
+          btn.addEventListener('click', () => {
+            hintsRevealed++;
+            renderHints();
+          });
+        } else {
+          btn.textContent = `Hint ${i + 1} 🔒`;
+          btn.disabled = true;
+        }
+        
+        hintButtons.appendChild(btn);
+      }
+    }
+
+    lockGuessBtn.addEventListener('click', () => {
+  const currentPlayer = players[currentPlayerIndex];
+  
+  if (!playerGuesses[currentPlayer.id]) {
+    alert('Please place your guess on the map first!');
+    return;
+  }
+  
+  lockGuessBtn.disabled = true;
+  
+  // Stop the timer for this player
+  stopTimer();
+  
+  // Move to next non-eliminated player
+  do {
+    currentPlayerIndex++;
+  } while (currentPlayerIndex < players.length && players[currentPlayerIndex].eliminated);
+  
+  // Check if all active players have guessed
+  const activePlayers = players.filter(p => !p.eliminated);
+  const allGuessed = activePlayers.every(p => playerGuesses[p.id]);
+  
+  if (currentPlayerIndex >= players.length || allGuessed) {
+    endRound();
+  } else {
+    updateCurrentTurn();
+    // Restart timer for next player
+    startTimer();
+  }
+});
+
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function pointsForDistance(distanceKm) {
+      if (distanceKm <= 10) return 1000;
+      if (distanceKm <= 50) return 800;
+      if (distanceKm <= 100) return 600;
+      if (distanceKm <= 250) return 400;
+      if (distanceKm <= 500) return 200;
+      if (distanceKm <= 1000) return 100;
+      return 50;
+    }
+
+    function endRound() {
+  stopTimer();
+  lockGuessBtn.classList.add('hidden');
+  
+  const answerLatLng = {lat: currentLandmark.latitude, lng: currentLandmark.longitude};
+  
+  // Show correct location
+  const correctIcon = L.divIcon({
+    className: 'custom-marker',
+    html: `<div style="background-color: #2ecc71; width: 35px; height: 35px; border-radius: 50%; border: 4px solid white; box-shadow: 0 3px 8px rgba(0,0,0,0.4); display: flex; align-items: center; justify-content: center; font-size: 20px;">✓</div>`,
+    iconSize: [35, 35],
+    iconAnchor: [17, 17]
+  });
+  
+  L.marker(answerLatLng, {icon: correctIcon}).addTo(map)
+    .bindPopup(`Correct Location: ${currentLandmark.name}`).openPopup();
+  
+  // Calculate scores and draw lines for ALL players (not just non-eliminated)
+  players.forEach(player => {
+    const guess = playerGuesses[player.id];
+    
+    // Skip if player didn't make a guess this round
+    if (!guess) {
+      if (!player.eliminated) {
+        player.roundScores.push({
+          distance: null,
+          basePoints: 0,
+          hintPenalty: 0,
+          netScore: 0
+        });
+      }
+      return;
+    }
+    
+    const distance = haversineDistance(
+      guess.latlng.lat,
+      guess.latlng.lng,
+      answerLatLng.lat,
+      answerLatLng.lng
+    );
+    
+    const basePoints = pointsForDistance(distance);
+    const hintPenalty = hintsRevealed * 25;
+    const netScore = Math.max(0, basePoints - hintPenalty);
+    
+    if (!player.eliminated) {
+      player.totalScore += netScore;
+    }
+    
+    player.roundScores.push({
+      distance: distance,
+      basePoints: basePoints,
+      hintPenalty: hintPenalty,
+      netScore: netScore
+    });
+    
+    // Draw line from guess to answer for ALL players who guessed
+    L.polyline([guess.latlng, answerLatLng], {
+      color: player.character.color,
+      weight: 3,
+      dashArray: '5, 10'
+    }).addTo(map);
+  });
+  
+  // Fit map to show all markers
+  const bounds = L.latLngBounds([answerLatLng]);
+  players.forEach(player => {
+    if (playerGuesses[player.id]) {
+      bounds.extend(playerGuesses[player.id].latlng);
+    }
+  });
+  map.fitBounds(bounds.pad(0.2));
+  
+  showLeaderboard();
+  
+  // Check for elimination
+  if (eliminationRounds.includes(currentRound)) {
+    eliminateLowestPlayer();
+  }
+  
+  nextRoundBtn.classList.remove('hidden');
+}
+
+    function showLeaderboard() {
+      leaderboard.classList.remove('hidden');
+      leaderboardBody.innerHTML = '';
+      
+      // Sort players by total score
+      const sortedPlayers = [...players].sort((a, b) => b.totalScore - a.totalScore);
+      
+      sortedPlayers.forEach((player, index) => {
+        const row = document.createElement('tr');
+        if (player.eliminated) {
+          row.classList.add('eliminated');
+        }
+        
+        const lastRound = player.roundScores[player.roundScores.length - 1] || { distance: null, netScore: 0 };
+        
+        row.innerHTML = `
+          <td><span class="player-rank">${index + 1}</span></td>
+          <td>${player.character.emoji} ${player.name}</td>
+          <td>${lastRound.distance !== null ? lastRound.distance.toFixed(2) + ' km' : 'No guess'}</td>
+          <td>${lastRound.netScore}</td>
+          <td><strong>${player.totalScore}</strong></td>
+        `;
+        
+        leaderboardBody.appendChild(row);
+      });
+    }
+
+    function eliminateLowestPlayer() {
+      const activePlayers = players.filter(p => !p.eliminated);
+      
+      if (activePlayers.length <= 1) return;
+      
+      // Find player with lowest score
+      activePlayers.sort((a, b) => a.totalScore - b.totalScore);
+      const eliminatedPlayer = activePlayers[0];
+      eliminatedPlayer.eliminated = true;
+      
+      eliminationNotice.classList.remove('hidden');
+      eliminationNotice.innerHTML = `
+        <h2>⚠️ ELIMINATION! ⚠️</h2>
+        <div class="eliminated-player">
+          ${eliminatedPlayer.character.emoji} ${eliminatedPlayer.name} has been eliminated!
+        </div>
+        <p>Final Score: ${eliminatedPlayer.totalScore} points</p>
+        <p>${activePlayers.length - 1} player(s) remaining</p>
+      `;
+    }
+
+    nextRoundBtn.addEventListener('click', () => {
+      const activePlayers = players.filter(p => !p.eliminated);
+      
+      if (activePlayers.length === 1 || currentRound >= landmarks.length) {
+        endGame();
+      } else {
+        startNewRound();
+      }
+    });
+
+    function endGame() {
+      stopTimer();
+      gameContainer.classList.add('hidden');
+      winnerContainer.classList.remove('hidden');
+      
+      const sortedPlayers = [...players].sort((a, b) => b.totalScore - a.totalScore);
+      const winner = sortedPlayers[0];
+      
+      document.getElementById('winnerAvatar').textContent = winner.character.emoji;
+      document.getElementById('winnerName').textContent = winner.name;
+      document.getElementById('winnerScore').textContent = `Final Score: ${winner.totalScore} points`;
+      
+      const finalLeaderboard = document.getElementById('finalLeaderboard');
+      finalLeaderboard.innerHTML = '';
+      
+      sortedPlayers.forEach((player, index) => {
+        const row = document.createElement('tr');
+        if (index === 0) row.classList.add('winner');
+        
+        row.innerHTML = `
+          <td><span class="player-rank">${index + 1}</span></td>
+          <td>${player.character.emoji} ${player.name}</td>
+          <td><strong>${player.totalScore}</strong></td>
+        `;
+        
+        finalLeaderboard.appendChild(row);
+      });
+    }
+
+    // Initialize
+    initializePlayerSlots();
+  </script>
+</body>
+</html>
